@@ -4,8 +4,8 @@ spring:
   datasource:
     url: jdbc:mysql://192.168.0.160:3306/rbac_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: gaia
-    password: Gaia@1234
+    username: xxxx
+    password: Xxxx@1234
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
       pool-name: rbac-hikari-pool
