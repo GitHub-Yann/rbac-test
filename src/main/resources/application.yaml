@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: rbac.demo
+  datasource:
+    url: jdbc:mysql://192.168.0.160:3306/rbac_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: gaia
+    password: Gaia@1234
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      pool-name: rbac-hikari-pool
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 600000
+      connection-timeout: 30000
+  jpa:
+    show-sql: true              # 控制台输出 SQL
+    hibernate:
+      ddl-auto: none            # 仅校验，不再自动调整表结构
+    properties:
+      hibernate:
+        format_sql: true
+rbac:
+  cache:
+    local:
+      max-size: 2000
+      ttl: 30s
+    remote:
+      enabled: false
+      ttl: 5m
+      key-prefix: "rbac:permissions:"
+logging:
+  level:
+    org.hibernate.SQL: debug    # SQL 语句
+    org.hibernate.type.descriptor.sql.BasicBinder: trace  # 绑定的参数

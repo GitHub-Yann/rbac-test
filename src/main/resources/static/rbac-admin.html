@@ -1,0 +1,1003 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBAC 管理控制台</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        body { background-color: #f5f6f8; }
+        .card { margin-bottom: 1.5rem; }
+        .grant-row select { min-width: 180px; }
+        .actions-cell {
+            max-width: 260px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .grant-row .action-picker {
+            position: relative;
+        }
+        .action-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            z-index: 1050;
+            display: none;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            background-color: #fff;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        .action-dropdown.show {
+            display: block;
+        }
+        .action-dropdown .card-body {
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .action-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .action-option:hover {
+            background-color: #f1f3f5;
+        }
+        .action-option .action-check {
+            color: #2ecc71;
+            visibility: hidden;
+            margin-left: 8px;
+        }
+        .action-option.selected .action-check {
+            visibility: visible;
+        }
+        .table-wrapper { max-height: 320px; overflow-y: auto; }
+        .offcanvas-half { --bs-offcanvas-width: 50vw; }
+        @media (max-width: 768px) {
+            .offcanvas-half { --bs-offcanvas-width: 100vw; }
+        }
+    </style>
+</head>
+<body>
+<div class="container my-4">
+    <h1 class="mb-2">RBAC 管理控制台</h1>
+    <p class="text-muted">管理资源、操作（权限）、角色，以及成员与角色的绑定。请使用浏览器调试当前项目提供的 REST API。</p>
+    <div id="alert-placeholder"></div>
+
+    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-resources-tab" data-bs-toggle="tab"
+                    data-bs-target="#tab-resources" type="button" role="tab">
+                资源
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-permissions-tab" data-bs-toggle="tab"
+                    data-bs-target="#tab-permissions" type="button" role="tab">
+                操作
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-roles-tab" data-bs-toggle="tab"
+                    data-bs-target="#tab-roles" type="button" role="tab">
+                角色
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-member-role-tab" data-bs-toggle="tab"
+                    data-bs-target="#tab-member-role" type="button" role="tab">
+                成员角色绑定
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="tab-resources" role="tabpanel">
+            <div class="card">
+                <div class="card-header">资源管理</div>
+                <div class="card-body">
+                    <form id="resource-form" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">领域 (domain)</label>
+                            <input type="text" class="form-control" id="resource-domain" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">类型 (type)</label>
+                            <input type="text" class="form-control" id="resource-type" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">资源键 (resourceKey)</label>
+                            <input type="text" class="form-control" id="resource-key" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">资源名称</label>
+                            <input type="text" class="form-control" id="resource-name" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">附加数据 (JSON，可选)</label>
+                            <input type="text" class="form-control" id="resource-metadata"
+                                   placeholder='{"method":"GET","path":"/api/v1/demo"}'>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button class="btn btn-primary" type="submit">新增资源</button>
+                            <button class="btn btn-outline-secondary" type="button" id="reload-resources">刷新列表</button>
+                        </div>
+                    </form>
+                    <div class="table-wrapper mt-3">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Domain</th>
+                                <th>Type</th>
+                                <th>Resource Key</th>
+                                <th>Name</th>
+                            </tr>
+                            </thead>
+                            <tbody id="resource-table-body">
+                            <tr><td colspan="5" class="text-center text-muted">暂无数据</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-permissions" role="tabpanel">
+            <div class="card">
+                <div class="card-header">操作管理</div>
+                <div class="card-body">
+                    <form id="permission-form" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">所属资源</label>
+                            <select class="form-select" id="permission-resource-select" required>
+                                <option value="">请选择资源</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">操作编码</label>
+                            <input type="text" class="form-control" id="permission-code" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">操作名称</label>
+                            <input type="text" class="form-control" id="permission-name" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">描述</label>
+                            <input type="text" class="form-control" id="permission-desc">
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-primary" type="submit">新增操作</button>
+                            <button class="btn btn-outline-secondary" type="button" id="load-permissions">查看该资源操作</button>
+                        </div>
+                    </form>
+                    <div class="table-wrapper mt-3">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Permission Code</th>
+                                <th>Permission Name</th>
+                                <th>Description</th>
+                            </tr>
+                            </thead>
+                            <tbody id="permission-table-body">
+                            <tr><td colspan="4" class="text-center text-muted">请先选择资源</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-roles" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>角色管理</span>
+                    <small class="text-muted">在表格点击“编辑”可将数据加载到下方更新表单</small>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">提示：在创建或更新角色前，请先在“资源”与“操作”页签里登记 resourceKey 与 action，系统会自动建立角色与权限的绑定。</p>
+                    <form id="role-form" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">角色编码</label>
+                            <input type="text" class="form-control" id="role-code" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">角色名称</label>
+                            <input type="text" class="form-control" id="role-name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">描述</label>
+                            <input type="text" class="form-control" id="role-desc">
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-semibold">权限项 (resourceKey + actions)</span>
+                                <button class="btn btn-sm btn-secondary" type="button" id="add-grant-item">添加权限项</button>
+                            </div>
+                            <div id="grant-items"></div>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button class="btn btn-primary" type="submit">创建角色</button>
+                            <button class="btn btn-outline-secondary" type="button" id="reload-roles">刷新角色列表</button>
+                        </div>
+                    </form>
+
+                    <div class="table-wrapper mt-4">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>角色编码</th>
+                                <th>角色名称</th>
+                                <th>状态</th>
+                                <th>权限详情</th>
+                                <th>操作</th>
+                            </tr>
+                            </thead>
+                            <tbody id="role-table-body">
+                            <tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-member-role" role="tabpanel">
+            <div class="card">
+                <div class="card-header">成员角色绑定</div>
+                <div class="card-body">
+                    <form id="member-role-form" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">成员 ID</label>
+                            <input type="number" class="form-control" id="member-id" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">角色 ID</label>
+                            <input type="number" class="form-control" id="member-role-id" list="roleIdOptions" required>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-success me-2" id="assign-role-btn">绑定角色</button>
+                            <button class="btn btn-outline-danger" id="revoke-role-btn">解除绑定</button>
+                        </div>
+                    </form>
+                    <small class="text-muted">当前绑定关系会展示在下方列表，可结合成员 ID、角色 ID 进行绑定或解绑操作。</small>
+
+                    <div class="table-wrapper mt-3">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                            <tr>
+                                <th>成员 ID</th>
+                                <th>成员名称</th>
+                                <th>角色 ID</th>
+                                <th>角色名称</th>
+                            </tr>
+                            </thead>
+                            <tbody id="member-role-table-body">
+                            <tr><td colspan="4" class="text-center text-muted">暂无绑定记录</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end offcanvas-half" tabindex="-1" id="roleEditDrawer" aria-labelledby="roleEditDrawerLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="roleEditDrawerLabel">编辑角色</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form id="role-update-form" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">角色 ID</label>
+                <input type="number" class="form-control" id="update-role-id" readonly>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">角色编码</label>
+                <input type="text" class="form-control" id="update-role-code" readonly>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">角色名称</label>
+                <input type="text" class="form-control" id="update-role-name" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">描述</label>
+                <input type="text" class="form-control" id="update-role-desc">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">是否启用</label>
+                <select id="update-role-enabled" class="form-select">
+                    <option value="true">启用</option>
+                    <option value="false">停用</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-semibold">权限项</span>
+                    <button class="btn btn-sm btn-secondary" type="button" id="add-update-grant-item">添加权限项</button>
+                </div>
+                <div class="row fw-semibold text-muted px-2">
+                    <div class="col-md-5">resourceKey</div>
+                    <div class="col-md-5">actions (可多选)</div>
+                    <div class="col-md-2 text-end">操作</div>
+                </div>
+                <div id="update-grant-items"></div>
+            </div>
+            <div class="col-12 text-end">
+                <button class="btn btn-warning" type="submit">保存更新</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<datalist id="roleIdOptions"></datalist>
+<script>
+    const alertPlaceholder = document.getElementById('alert-placeholder');
+    let resourceCache = [];
+    let roleCache = [];
+    let roleEditDrawerInstance;
+    const permissionCache = new Map();
+    let activeActionRow = null;
+
+    function showAlert(message, type = 'success') {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+        alertPlaceholder.append(wrapper);
+        setTimeout(() => {
+            wrapper.querySelector('.alert')?.classList.remove('show');
+            wrapper.remove();
+        }, 5000);
+    }
+
+    async function fetchJson(url, options = {}) {
+        const resp = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...options
+        });
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(text || resp.statusText);
+        }
+        if (resp.status === 204) {
+            return null;
+        }
+        return resp.json();
+    }
+
+    function renderResourceTable(resources) {
+        const body = document.getElementById('resource-table-body');
+        if (!resources.length) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无数据</td></tr>';
+            return;
+        }
+        body.innerHTML = resources.map(r => `
+            <tr>
+                <td>${r.id}</td>
+                <td>${r.domain}</td>
+                <td>${r.type}</td>
+                <td>${r.resourceKey}</td>
+                <td>${r.resourceName}</td>
+            </tr>`).join('');
+    }
+
+    function refreshResourceOptions() {
+        const select = document.getElementById('permission-resource-select');
+        select.innerHTML = '<option value="">请选择资源</option>' +
+            resourceCache.map(r => `<option value="${r.id}">${r.resourceName} (${r.resourceKey})</option>`).join('');
+        refreshGrantResourceOptions();
+    }
+
+    function refreshGrantResourceOptions() {
+        document.querySelectorAll('.grant-row').forEach(row => {
+            const select = row.querySelector('.grant-resource-select');
+            if (!select) {
+                return;
+            }
+            const previous = select.value;
+            refreshSingleGrantResourceOptions(select);
+            if (previous) {
+                select.value = previous;
+            }
+            applyPendingGrantSelections(row);
+        });
+    }
+
+    function refreshSingleGrantResourceOptions(select) {
+        if (!select) {
+            return;
+        }
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">请选择资源</option>' +
+            resourceCache.map(r => `<option value="${r.id}">${r.resourceName} (${r.resourceKey})</option>`).join('');
+        if (currentValue) {
+            select.value = currentValue;
+        }
+    }
+
+    function renderRoleTable(roles) {
+        const body = document.getElementById('role-table-body');
+        if (!roles.length) {
+            body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
+            return;
+        }
+        body.innerHTML = roles.map(role => `
+            <tr>
+                <td>${role.id}</td>
+                <td>${role.roleCode}</td>
+                <td>${role.roleName}</td>
+                <td>${role.enabled ? '启用' : '停用'}</td>
+                <td class="actions-cell" title="${role.grants.map(g => g.resourceKey + ' => ' + g.actions.join(', ')).join('\\n')}">
+                    ${role.grants.map(g => g.resourceKey + ' => ' + g.actions.join(', ')).join('\\n')}
+                </td>
+                <td><button class="btn btn-sm btn-outline-primary" data-role-id="${role.id}">编辑</button></td>
+            </tr>`).join('');
+        document.querySelectorAll('[data-role-id]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = Number(btn.dataset.roleId);
+                const target = roleCache.find(r => r.id === id);
+                if (target) {
+                    loadRoleIntoUpdateForm(target);
+                }
+            });
+        });
+
+        const roleIdOptions = document.getElementById('roleIdOptions');
+        roleIdOptions.innerHTML = roles.map(r => `<option value="${r.id}"></option>`).join('');
+    }
+
+    function renderMemberRoleTable(bindings) {
+        const body = document.getElementById('member-role-table-body');
+        if (!bindings.length) {
+            body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无绑定记录</td></tr>';
+            return;
+        }
+        body.innerHTML = bindings.map(item => `
+            <tr>
+                <td>${item.memberId}</td>
+                <td>${item.memberName || '-'}</td>
+                <td>${item.roleId}</td>
+                <td>${item.roleName || '-'}</td>
+            </tr>`).join('');
+    }
+    function createGrantRow(container, resourceKey = '', actions = []) {
+        const row = document.createElement('div');
+        row.className = 'row g-2 align-items-end grant-row mb-2';
+        row.innerHTML = `
+            <div class="col-md-5">
+                <select class="form-select grant-resource-select">
+                    <option value="">请选择资源</option>
+                </select>
+            </div>
+            <div class="col-md-5 action-picker">
+                <input type="text" class="form-control grant-actions-display"
+                       placeholder="请选择资源后加载操作" readonly>
+                <input type="hidden" class="grant-actions-values">
+                <div class="action-dropdown shadow-sm bg-white border rounded">
+                    <div class="card-body p-2 action-dropdown-content">
+                        <div class="text-muted small text-center">请先选择资源</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-danger w-100" type="button">移除</button>
+            </div>`;
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        if (resourceKey) {
+            row.dataset.pendingResourceKey = resourceKey;
+        }
+        if (actions && actions.length) {
+            row.dataset.pendingActions = JSON.stringify(actions);
+        }
+        container.append(row);
+        initializeGrantRow(row);
+    }
+
+    function initializeGrantRow(row) {
+        const resourceSelect = row.querySelector('.grant-resource-select');
+        const actionDisplay = row.querySelector('.grant-actions-display');
+        refreshSingleGrantResourceOptions(resourceSelect);
+        resetActionPicker(row);
+        resourceSelect.addEventListener('change', () => {
+            const resourceId = resourceSelect.value;
+            clearActionSelections(row);
+            if (resourceId) {
+                loadActionsForGrantRow(row, resourceId);
+            } else {
+                setActionDropdownMessage(row, '请先选择资源');
+            }
+        });
+        actionDisplay.addEventListener('focus', () => handleActionPickerFocus(row));
+        actionDisplay.addEventListener('click', () => handleActionPickerFocus(row));
+        applyPendingGrantSelections(row);
+    }
+
+    function handleActionPickerFocus(row) {
+        openActionDropdown(row);
+        const resourceId = row.querySelector('.grant-resource-select').value;
+        if (!resourceId) {
+            setActionDropdownMessage(row, '请先选择资源');
+            return;
+        }
+        const selected = getSelectedActions(row);
+        if (row.dataset.loadedResourceId === resourceId && row.dataset.actionsLoaded === 'true') {
+            reflectSelectionOnOptions(row, selected);
+            return;
+        }
+        loadActionsForGrantRow(row, resourceId, selected);
+    }
+
+    function applyPendingGrantSelections(row) {
+        const resourceKey = row.dataset.pendingResourceKey;
+        if (!resourceKey) {
+            return;
+        }
+        const target = resourceCache.find(r => r.resourceKey === resourceKey);
+        if (!target) {
+            return;
+        }
+        row.querySelector('.grant-resource-select').value = String(target.id);
+        const pendingActions = row.dataset.pendingActions ? JSON.parse(row.dataset.pendingActions) : [];
+        delete row.dataset.pendingResourceKey;
+        delete row.dataset.pendingActions;
+        loadActionsForGrantRow(row, target.id, pendingActions);
+    }
+
+    function resetActionPicker(row) {
+        setActionDropdownMessage(row, '请先选择资源');
+        clearActionSelections(row);
+        row.actionLabelMap = new Map();
+    }
+
+    function clearActionSelections(row) {
+        setSelectedActions(row, []);
+        delete row.dataset.loadedResourceId;
+        delete row.dataset.actionsLoaded;
+        row.querySelectorAll('.action-option').forEach(option => option.classList.remove('selected'));
+    }
+
+    function setActionDropdownMessage(row, message) {
+        const container = row.querySelector('.action-dropdown-content');
+        if (!container) {
+            return;
+        }
+        container.innerHTML = `<div class="text-muted small text-center py-2">${message}</div>`;
+    }
+
+    async function loadActionsForGrantRow(row, resourceId, preselectedActions = []) {
+        const resourceSelect = row.querySelector('.grant-resource-select');
+        setActionDropdownMessage(row, '正在加载操作...');
+        try {
+            const permissions = await fetchPermissionsForResource(resourceId);
+            if (resourceSelect.value !== String(resourceId)) {
+                return;
+            }
+            row.dataset.loadedResourceId = String(resourceId);
+            row.dataset.actionsLoaded = 'true';
+            renderActionOptions(row, permissions, preselectedActions);
+        } catch (err) {
+            setActionDropdownMessage(row, '加载操作失败');
+            showAlert(`加载操作失败：${err.message}`, 'danger');
+        }
+    }
+
+    function renderActionOptions(row, permissions, preselectedActions = []) {
+        const container = row.querySelector('.action-dropdown-content');
+        if (!container) {
+            return;
+        }
+        if (!permissions.length) {
+            row.actionLabelMap = new Map();
+            container.innerHTML = '<div class="text-muted small text-center py-2">该资源暂未配置操作</div>';
+            setSelectedActions(row, []);
+            return;
+        }
+        const selectedSet = new Set(Array.isArray(preselectedActions) ? preselectedActions : []);
+        const labelMap = new Map();
+        permissions.forEach(p => labelMap.set(p.actionCode, p.actionName || p.actionCode));
+        row.actionLabelMap = labelMap;
+        container.innerHTML = permissions.map(p => `
+            <div class="action-option" data-action="${p.actionCode}" data-label="${p.actionName || p.actionCode}">
+                <span>${p.actionName || p.actionCode}</span>
+                <span class="action-check">✔</span>
+            </div>`).join('');
+        container.querySelectorAll('.action-option').forEach(option => {
+            const code = option.dataset.action;
+            if (selectedSet.has(code)) {
+                option.classList.add('selected');
+            }
+            option.addEventListener('click', () => {
+                option.classList.toggle('selected');
+                updateSelectedActionsFromOptions(row);
+            });
+        });
+        updateSelectedActionsFromOptions(row);
+    }
+
+    async function fetchPermissionsForResource(resourceId, useCache = true) {
+        const key = String(resourceId);
+        if (useCache && permissionCache.has(key)) {
+            return permissionCache.get(key);
+        }
+        const data = await fetchJson(`/api/v1/resources/${resourceId}/permissions`);
+        permissionCache.set(key, data);
+        return data;
+    }
+
+    function invalidatePermissionCache(resourceId) {
+        permissionCache.delete(String(resourceId));
+    }
+
+    function getSelectedActions(row) {
+        const hidden = row.querySelector('.grant-actions-values');
+        if (!hidden || !hidden.value.trim()) {
+            return [];
+        }
+        return hidden.value.split(',').map(v => v.trim()).filter(Boolean);
+    }
+
+    function setSelectedActions(row, actions) {
+        const normalized = Array.isArray(actions) ? actions.filter(Boolean) : [];
+        const hidden = row.querySelector('.grant-actions-values');
+        const display = row.querySelector('.grant-actions-display');
+        if (hidden) {
+            hidden.value = normalized.join(',');
+        }
+        if (display) {
+            display.value = normalized.map(code => findActionLabel(row, code)).filter(Boolean).join(', ');
+        }
+    }
+
+    function findActionLabel(row, actionCode) {
+        if (row.actionLabelMap instanceof Map && row.actionLabelMap.has(actionCode)) {
+            return row.actionLabelMap.get(actionCode);
+        }
+        return actionCode;
+    }
+
+    function reflectSelectionOnOptions(row, selected = []) {
+        const options = row.querySelectorAll('.action-option');
+        if (!options.length) {
+            return;
+        }
+        const set = new Set(selected);
+        options.forEach(option => {
+            option.classList.toggle('selected', set.has(option.dataset.action));
+        });
+        updateSelectedActionsFromOptions(row);
+    }
+
+    function updateSelectedActionsFromOptions(row) {
+        const values = Array.from(row.querySelectorAll('.action-option.selected'))
+            .map(option => option.dataset.action);
+        setSelectedActions(row, values);
+    }
+
+    function openActionDropdown(row) {
+        const dropdown = row.querySelector('.action-dropdown');
+        if (!dropdown) {
+            return;
+        }
+        dropdown.classList.add('show');
+        activeActionRow = row;
+    }
+
+    function closeActionDropdown(row) {
+        const dropdown = row.querySelector('.action-dropdown');
+        if (!dropdown) {
+            return;
+        }
+        dropdown.classList.remove('show');
+        if (activeActionRow === row) {
+            activeActionRow = null;
+        }
+        setSelectedActions(row, getSelectedActions(row));
+    }
+
+    document.addEventListener('click', event => {
+        if (activeActionRow && !activeActionRow.contains(event.target)) {
+            closeActionDropdown(activeActionRow);
+        }
+    });
+
+    function collectGrants(containerId) {
+        const container = document.getElementById(containerId);
+        return Array.from(container.querySelectorAll('.grant-row')).map(row => {
+            const resourceSelect = row.querySelector('.grant-resource-select');
+            if (!resourceSelect) {
+                return null;
+            }
+            const resourceId = resourceSelect.value;
+            if (!resourceId) {
+                return null;
+            }
+            const resource = resourceCache.find(r => String(r.id) === resourceId);
+            if (!resource) {
+                return null;
+            }
+            const actions = getSelectedActions(row);
+            if (!actions.length) {
+                return null;
+            }
+            return { resourceKey: resource.resourceKey, actions };
+        }).filter(Boolean);
+    }
+
+    function loadRoleIntoUpdateForm(role) {
+        document.getElementById('update-role-id').value = role.id;
+        document.getElementById('update-role-code').value = role.roleCode;
+        document.getElementById('update-role-name').value = role.roleName;
+        document.getElementById('update-role-desc').value = role.description || '';
+        document.getElementById('update-role-enabled').value = role.enabled ? 'true' : 'false';
+        const container = document.getElementById('update-grant-items');
+        container.innerHTML = '';
+        role.grants.forEach(grant => createGrantRow(container, grant.resourceKey, grant.actions || []));
+        if (!role.grants.length) {
+            createGrantRow(container);
+        }
+        if (!roleEditDrawerInstance) {
+            const drawerElement = document.getElementById('roleEditDrawer');
+            roleEditDrawerInstance = new bootstrap.Offcanvas(drawerElement);
+        }
+        roleEditDrawerInstance.show();
+        showAlert(`已加载角色 ${role.roleCode}，请在右侧抽屉中编辑。`, 'info');
+    }
+
+    async function loadResources() {
+        try {
+            const data = await fetchJson('/api/v1/resources');
+            resourceCache = data;
+            renderResourceTable(data);
+            refreshResourceOptions();
+        } catch (err) {
+            showAlert(`加载资源失败：${err.message}`, 'danger');
+        }
+    }
+
+    async function loadRoles() {
+        try {
+            const data = await fetchJson('/api/v1/roles');
+            roleCache = data;
+            renderRoleTable(data);
+        } catch (err) {
+            showAlert(`加载角色失败：${err.message}`, 'danger');
+        }
+    }
+
+    async function loadMemberRoleBindings(filterMemberId) {
+        try {
+            let url = '/api/v1/member-roles';
+            if (filterMemberId) {
+                url += `?memberId=${encodeURIComponent(filterMemberId)}`;
+            }
+            const data = await fetchJson(url);
+            renderMemberRoleTable(data);
+        } catch (err) {
+            showAlert(`加载成员角色绑定失败：${err.message}`, 'danger');
+        }
+    }
+
+    async function loadPermissionsForResource(resourceId) {
+        if (!resourceId) {
+            document.getElementById('permission-table-body').innerHTML =
+                '<tr><td colspan="4" class="text-center text-muted">请先选择资源</td></tr>';
+            return;
+        }
+        try {
+            const data = await fetchPermissionsForResource(resourceId, false);
+            const body = document.getElementById('permission-table-body');
+            if (!data.length) {
+                body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无操作</td></tr>';
+                return;
+            }
+            body.innerHTML = data.map(action => `
+                <tr>
+                    <td>${action.id}</td>
+                    <td>${action.actionCode}</td>
+                    <td>${action.actionName}</td>
+                    <td>${action.description || ''}</td>
+                </tr>`).join('');
+        } catch (err) {
+            showAlert(`加载操作失败：${err.message}`, 'danger');
+        }
+    }
+    document.getElementById('resource-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            domain: document.getElementById('resource-domain').value.trim(),
+            type: document.getElementById('resource-type').value.trim(),
+            resourceKey: document.getElementById('resource-key').value.trim(),
+            resourceName: document.getElementById('resource-name').value.trim()
+        };
+        const metadataText = document.getElementById('resource-metadata').value.trim();
+        if (metadataText) {
+            try {
+                payload.metadata = JSON.parse(metadataText);
+            } catch (err) {
+                showAlert('附加数据必须是合法 JSON。', 'warning');
+                return;
+            }
+        }
+        try {
+            await fetchJson('/api/v1/resources', {
+                method: 'POST',
+                body: JSON.stringify([payload])
+            });
+            showAlert('资源创建成功。');
+            e.target.reset();
+            loadResources();
+        } catch (err) {
+            showAlert(`资源创建失败：${err.message}`, 'danger');
+        }
+    });
+
+    document.getElementById('reload-resources').addEventListener('click', loadResources);
+
+    document.getElementById('permission-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const resourceId = document.getElementById('permission-resource-select').value;
+        if (!resourceId) {
+            showAlert('请先选择资源。', 'warning');
+            return;
+        }
+        const payload = {
+            actionCode: document.getElementById('permission-code').value.trim(),
+            actionName: document.getElementById('permission-name').value.trim(),
+            description: document.getElementById('permission-desc').value.trim()
+        };
+        try {
+            await fetchJson(`/api/v1/resources/${resourceId}/permissions`, {
+                method: 'POST',
+                body: JSON.stringify([payload])
+            });
+            showAlert('操作创建成功。');
+            e.target.reset();
+            invalidatePermissionCache(resourceId);
+            loadPermissionsForResource(resourceId);
+        } catch (err) {
+            showAlert(`操作创建失败：${err.message}`, 'danger');
+        }
+    });
+
+    document.getElementById('load-permissions').addEventListener('click', () => {
+        const resourceId = document.getElementById('permission-resource-select').value;
+        loadPermissionsForResource(resourceId);
+    });
+
+    document.getElementById('add-grant-item').addEventListener('click', () => {
+        createGrantRow(document.getElementById('grant-items'));
+    });
+
+    document.getElementById('add-update-grant-item').addEventListener('click', () => {
+        createGrantRow(document.getElementById('update-grant-items'));
+    });
+
+    document.getElementById('role-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const grants = collectGrants('grant-items');
+        if (!grants.length) {
+            showAlert('请至少配置一条权限项。', 'warning');
+            return;
+        }
+        const payload = {
+            roleCode: document.getElementById('role-code').value.trim(),
+            roleName: document.getElementById('role-name').value.trim(),
+            description: document.getElementById('role-desc').value.trim(),
+            grants
+        };
+        try {
+            await fetchJson('/api/v1/roles', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            showAlert('角色创建成功。');
+            e.target.reset();
+            document.getElementById('grant-items').innerHTML = '';
+            createGrantRow(document.getElementById('grant-items'));
+            loadRoles();
+        } catch (err) {
+            showAlert(`角色创建失败：${err.message}`, 'danger');
+        }
+    });
+
+    document.getElementById('role-update-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const roleId = document.getElementById('update-role-id').value;
+        if (!roleId) {
+            showAlert('请先通过“编辑”按钮加载需要修改的角色。', 'warning');
+            return;
+        }
+        const grants = collectGrants('update-grant-items');
+        if (!grants.length) {
+            showAlert('请至少配置一条权限项。', 'warning');
+            return;
+        }
+        const payload = {
+            roleName: document.getElementById('update-role-name').value.trim(),
+            description: document.getElementById('update-role-desc').value.trim(),
+            enabled: document.getElementById('update-role-enabled').value === 'true',
+            grants
+        };
+        try {
+            await fetchJson(`/api/v1/roles/${roleId}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+            showAlert('角色更新成功。');
+            loadRoles();
+            roleEditDrawerInstance?.hide();
+        } catch (err) {
+            showAlert(`角色更新失败：${err.message}`, 'danger');
+        }
+    });
+
+    document.getElementById('reload-roles').addEventListener('click', loadRoles);
+
+    document.getElementById('assign-role-btn').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const memberId = document.getElementById('member-id').value;
+        const roleId = document.getElementById('member-role-id').value;
+        if (!memberId || !roleId) {
+            showAlert('请填写成员 ID 和角色 ID。', 'warning');
+            return;
+        }
+        try {
+            await fetchJson(`/api/v1/members/${memberId}/roles/${roleId}`, {
+                method: 'POST',
+                body: '{}'
+            });
+            showAlert('角色绑定成功。');
+            const currentMemberFilter = document.getElementById('member-id').value.trim();
+            loadMemberRoleBindings(currentMemberFilter || undefined);
+        } catch (err) {
+            showAlert(`角色绑定失败：${err.message}`, 'danger');
+        }
+    });
+
+    document.getElementById('revoke-role-btn').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const memberId = document.getElementById('member-id').value;
+        const roleId = document.getElementById('member-role-id').value;
+        if (!memberId || !roleId) {
+            showAlert('请填写成员 ID 和角色 ID。', 'warning');
+            return;
+        }
+        try {
+            await fetchJson(`/api/v1/members/${memberId}/roles/${roleId}`, {
+                method: 'DELETE'
+            });
+            showAlert('角色解绑成功。');
+            const currentMemberFilter = document.getElementById('member-id').value.trim();
+            loadMemberRoleBindings(currentMemberFilter || undefined);
+        } catch (err) {
+            showAlert(`角色解绑失败：${err.message}`, 'danger');
+        }
+    });
+
+    // 初始化默认的权限配置输入区，避免页面留空
+    createGrantRow(document.getElementById('grant-items'));
+    createGrantRow(document.getElementById('update-grant-items'));
+    loadResources();
+    loadRoles();
+    loadMemberRoleBindings();
+</script>
+<script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+</body>
+</html>
